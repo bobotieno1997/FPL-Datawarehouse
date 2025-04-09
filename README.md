@@ -10,13 +10,107 @@ The Medallion architecture has been adopted as the solution approach, as FPL dat
 
 ![Architecture](https://github.com/bobotieno1997/FPL-Datawarehouse/blob/7ce01786f2f14156adaf3d5e4c338c796be1fa1e/project_files/Architecture/overview_architecture%20.jpg)
 
-### Bronze Layer
-The bronze layer serves as the landing zone for all incoming datasets, ensuring data availability for processing before being loaded into the silver layer. This layer is fully refreshed during every run.
+### 🥉 Bronze Layer
 
-Click [here](https://github.com/bobotieno1997/FPL-Datawarehouse/tree/main/dags/01_Bronze) to view the Airflow DAGs responsible for loading data into the bronze database.
+The **Bronze Layer** acts as the initial landing zone for all raw incoming datasets. It ensures data availability and reliability before further transformation in the Silver Layer. This layer is **fully refreshed** with each pipeline run, making it the foundation for the entire data processing workflow.
 
-Example of Airflow web server UI displaying successful DAG runs and tables:
+You can view the ELT scripts responsible for loading data into the bronze database [here](https://github.com/bobotieno1997/FPL-Datawarehouse/tree/main/dags/01_Bronze).
 
+The code is orchestrated by the following Airflow DAG:
+
+```python
+import psycopg2
+from airflow import DAG
+from datetime import datetime, timedelta
+import logging
+from airflow.operators.bash import BashOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+# Activate virtual environment
+virtual_env = 'source /home/luxds/Bob/Fantasy/venv/bin/activate'
+
+# DAG default arguments
+default_args = {
+    "owner": "Bob Otieno",
+    "depends_on_past": False,
+    "start_date": datetime(2025, 4, 7),
+    "email": ["bobotieno99@gmail.com"],
+    "email_on_failure": False,
+    "email_on_retry": True,
+    "retries": 2,
+    "retry_delay": timedelta(minutes=2),
+}
+
+# Define Airflow DAG
+with DAG(
+    "Fantasy_PL_Datawarehouse", 
+    default_args=default_args,
+    schedule="@daily",
+    catchup=False, 
+    tags=["Bob Otieno", "FPL pipeline"],
+) as dag:
+    
+    # Bronze Layer - Raw data ingestion scripts
+    Run_teams_data = BashOperator(
+        task_id='Load_Teams_Info',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/01_FPL_raw_teams.py'
+    )
+
+    Run_teams_players = BashOperator(
+        task_id='Load_Players_Info',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/02_FPL_raw_players.py'
+    )
+
+    Run_gameweek_info = BashOperator(
+        task_id='Load_gameweek_Info',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/03_FPL_raw_game_week.py'
+    )
+
+    Run_players_stats = BashOperator(
+        task_id='Load_Player_stats',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/04_FPL_raw_stats.py'
+    )
+
+    # Silver Layer - Data transformations & procedures
+    Run_usp_teams_info = SQLExecuteQueryOperator(
+        task_id="Load_teams_info_silver",
+        conn_id="FPL_db",  
+        sql="CALL silver.usp_update_team_info();"
+    )
+
+    Run_usp_player_info = SQLExecuteQueryOperator(
+        task_id="Load_players_info_silver",
+        conn_id="FPL_db",  
+        sql="CALL silver.usp_update_player_info();"
+    )
+
+    Run_usp_games_info = SQLExecuteQueryOperator(
+        task_id="Load_players_games_silver",
+        conn_id="FPL_db",  
+        sql="CALL silver.usp_update_games_info();"
+    )
+
+    Run_usp_future_games_info = SQLExecuteQueryOperator(
+        task_id="Load_future_games_silver",
+        conn_id="FPL_db",  
+        sql="CALL silver.usp_update_future_games_info();"
+    )
+
+    Run_usp_player_stats = SQLExecuteQueryOperator(
+        task_id="Load_player_stats_silver",
+        conn_id="FPL_db",  
+        sql="CALL silver.usp_update_players_stats();"
+    )
+
+    # Task dependencies
+    [Run_teams_data, Run_teams_players, Run_gameweek_info, Run_players_stats] >> \
+    Run_usp_teams_info >> Run_usp_player_info >> Run_usp_games_info >> \
+    Run_usp_future_games_info >> Run_usp_player_stats
+```
+Here’s the visual representation of the DAG execution flow:
 ![Airflow](https://github.com/bobotieno1997/FPL-Datawarehouse/blob/3c80cc938e837b3cdafc123f8afb7909bcb5ca6e/project_files/Other%20files/airflow_dags.png)
 
 Sample data from the tables:
