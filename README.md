@@ -25,11 +25,13 @@ from datetime import datetime, timedelta
 import logging
 from airflow.operators.bash import BashOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from airflow.utils.helpers import chain
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Activate virtual environment
+# Set up environment variables to run the code
 virtual_env = 'source /home/luxds/Bob/Fantasy/venv/bin/activate'
 
 # DAG default arguments
@@ -53,7 +55,7 @@ with DAG(
     tags=["Bob Otieno", "FPL pipeline"],
 ) as dag:
     
-    # Bronze Layer - Raw data ingestion scripts
+    # Load Bronze Layer
     Run_teams_data = BashOperator(
         task_id='Load_Teams_Info',
         bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/01_FPL_raw_teams.py'
@@ -74,7 +76,7 @@ with DAG(
         bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/04_FPL_raw_stats.py'
     )
 
-    # Silver Layer - Data transformations & procedures
+    # Load Silver Layer
     Run_usp_teams_info = SQLExecuteQueryOperator(
         task_id="Load_teams_info_silver",
         conn_id="FPL_db",  
@@ -105,10 +107,66 @@ with DAG(
         sql="CALL silver.usp_update_players_stats();"
     )
 
-    # Task dependencies
-    [Run_teams_data, Run_teams_players, Run_gameweek_info, Run_players_stats] >> \
-    Run_usp_teams_info >> Run_usp_player_info >> Run_usp_games_info >> \
-    Run_usp_future_games_info >> Run_usp_player_stats
+    # Load Gold Layer
+    Run_dim_teams = BashOperator(
+        task_id='DimTeams',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/01_DimTeams.py'
+    )
+
+    Run_dim_players = BashOperator(
+        task_id='DimPlayers',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/02_DimPlayers.py'
+    )
+
+    Run_dim_stats = BashOperator(
+        task_id='DimStats',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/03_DimStatType.py'
+    )
+
+    Run_fct_player_history = BashOperator(
+        task_id='FctPlayerHistory',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/04_FctPlayerHistory.py'
+    )
+
+    Run_fct_standing = BashOperator(
+        task_id='FctStanding',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/05_FctStanding.py'
+    )
+
+    Run_fct_results = BashOperator(
+        task_id='FctResults',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/06_FctResults.py'
+    )
+
+    Run_fct_player_stats = BashOperator(
+        task_id='FctPlayerStats',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/07_FctPlayerStat.py'
+    )
+
+    Run_fct_future_games = BashOperator(
+        task_id='FctFutureGames',
+        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/08_FctFutureGames.py'
+    )
+
+
+    
+    # Run Tasks
+    # Run bronze tasks in parallel
+    [Run_teams_data, Run_teams_players, Run_gameweek_info, Run_players_stats] >> Run_usp_teams_info
+
+    # Sequential silver tasks
+    Run_usp_teams_info >> Run_usp_player_info >> Run_usp_games_info >> Run_usp_future_games_info >> Run_usp_player_stats
+
+    # Run dim_* tasks in parallel after silver
+    Run_usp_player_stats >> [Run_dim_teams, Run_dim_players, Run_dim_stats]
+
+    # Run all fact_* tasks after all dim_* tasks
+    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_player_history
+    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_standing
+    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_results
+    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_player_stats
+    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_future_games
+
 ```
 Here’s the visual representation of the DAG execution flow:
 ![Airflow](https://github.com/bobotieno1997/FPL-Datawarehouse/blob/3c80cc938e837b3cdafc123f8afb7909bcb5ca6e/project_files/Other%20files/airflow_dags.png)
