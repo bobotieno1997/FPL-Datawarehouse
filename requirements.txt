@@ -6,3 +6,5 @@ datetime
 sqlalchemy==2.0.39
 psycopg2
 dotenv
+pymysql
+cryptography
