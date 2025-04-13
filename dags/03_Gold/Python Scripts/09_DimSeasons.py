@@ -75,8 +75,8 @@ def load_data_to_mysql(df: pd.DataFrame, table_name: str):
 
 
 def main():
-    query = 'SELECT * FROM gold.v_fct_future_games'
-    table_name = 'FctFutureGames'
+    query = 'SELECT * FROM gold.v_dimension_season'
+    table_name = 'DimSeasons'
 
     df = fetch_data_from_postgres(query)
     df.head(5)
