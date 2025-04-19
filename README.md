@@ -8,7 +8,7 @@ This repository contains SQL and Python scripts for managing the Fantasy Premier
 ## Architecture Overview
 The Medallion architecture has been adopted as the solution approach, as FPL data is only available at the season level. For example, if the current season is 2024/2025, only data for that season is accessible.
 
-![Architecture](https://github.com/bobotieno1997/FPL-Datawarehouse/blob/7ce01786f2f14156adaf3d5e4c338c796be1fa1e/project_files/Architecture/overview_architecture%20.jpg)
+![Architecture](https://github.com/bobotieno1997/FPL-Datawarehouse/blob/b6788875e725c4043d382021fa9284ff84f45fec/project_files/Architecture/overview_architecture.png)
 
 ### 🥉 Bronze Layer
 
@@ -19,6 +19,7 @@ You can view the ELT scripts responsible for loading data into the bronze databa
 The code is orchestrated by the following Airflow DAG:
 
 ```python
+
 import psycopg2
 from airflow import DAG
 from datetime import datetime, timedelta
@@ -32,7 +33,7 @@ from airflow.utils.helpers import chain
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Set up environment variables to run the code
-virtual_env = 'source /home/luxds/Bob/Fantasy/venv/bin/activate'
+virtual_env ='source /home/de_user/bob/projects/virtual_envs/fpl_env/bin/activate'
 
 # DAG default arguments
 default_args = {
@@ -48,108 +49,116 @@ default_args = {
 
 # Define Airflow DAG
 with DAG(
-    "Fantasy_PL_Datawarehouse", 
+    "Fantasy_PL_Datawarehouse",
     default_args=default_args,
     schedule="@daily",
-    catchup=False, 
+    catchup=False,
     tags=["Bob Otieno", "FPL pipeline"],
 ) as dag:
-    
+
     # Load Bronze Layer
     Run_teams_data = BashOperator(
         task_id='Load_Teams_Info',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/01_FPL_raw_teams.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/01_Bronze/01_FPL_raw_teams.py'
     )
 
     Run_teams_players = BashOperator(
         task_id='Load_Players_Info',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/02_FPL_raw_players.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/01_Bronze/02_FPL_raw_players.py'
     )
 
     Run_gameweek_info = BashOperator(
         task_id='Load_gameweek_Info',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/03_FPL_raw_game_week.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/01_Bronze/03_FPL_raw_game_week.py'
     )
 
     Run_players_stats = BashOperator(
         task_id='Load_Player_stats',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/01_Bronze/04_FPL_raw_stats.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/01_Bronze/04_FPL_raw_stats.py'
     )
 
-    # Load Silver Layer
+      # Load Silver Layer
     Run_usp_teams_info = SQLExecuteQueryOperator(
         task_id="Load_teams_info_silver",
-        conn_id="FPL_db",  
+        conn_id="FPL_db",
         sql="CALL silver.usp_update_team_info();"
     )
 
     Run_usp_player_info = SQLExecuteQueryOperator(
         task_id="Load_players_info_silver",
-        conn_id="FPL_db",  
+        conn_id="FPL_db",
         sql="CALL silver.usp_update_player_info();"
     )
 
     Run_usp_games_info = SQLExecuteQueryOperator(
         task_id="Load_players_games_silver",
-        conn_id="FPL_db",  
+        conn_id="FPL_db",
         sql="CALL silver.usp_update_games_info();"
     )
 
     Run_usp_future_games_info = SQLExecuteQueryOperator(
         task_id="Load_future_games_silver",
-        conn_id="FPL_db",  
+        conn_id="FPL_db",
         sql="CALL silver.usp_update_future_games_info();"
     )
 
     Run_usp_player_stats = SQLExecuteQueryOperator(
         task_id="Load_player_stats_silver",
-        conn_id="FPL_db",  
+        conn_id="FPL_db",
         sql="CALL silver.usp_update_players_stats();"
     )
 
     # Load Gold Layer
     Run_dim_teams = BashOperator(
         task_id='DimTeams',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/01_DimTeams.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/01_DimTeams.py'
     )
 
     Run_dim_players = BashOperator(
         task_id='DimPlayers',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/02_DimPlayers.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/02_DimPlayers.py'
     )
 
     Run_dim_stats = BashOperator(
         task_id='DimStats',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/03_DimStatType.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/03_DimStatType.py'
     )
 
     Run_fct_player_history = BashOperator(
         task_id='FctPlayerHistory',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/04_FctPlayerHistory.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/04_FctPlayerHistory.py'
     )
 
     Run_fct_standing = BashOperator(
         task_id='FctStanding',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/05_FctStanding.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/05_FctStanding.py'
     )
 
     Run_fct_results = BashOperator(
         task_id='FctResults',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/06_FctResults.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/06_FctResults.py'
     )
 
     Run_fct_player_stats = BashOperator(
         task_id='FctPlayerStats',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/07_FctPlayerStat.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/07_FctPlayerStat.py'
     )
 
     Run_fct_future_games = BashOperator(
         task_id='FctFutureGames',
-        bash_command=f'{virtual_env} && python3 /home/luxds/Bob/Fantasy/dags/03_Gold/Python\ Scripts/08_FctFutureGames.py'
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/08_FctFutureGames.py'
     )
 
+    Run_dim_season = BashOperator(
+        task_id='DimensionSeasons',
+        bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/09_DimSeasons.py'
+    )
 
-    
+    Run_fct_team_history = BashOperator(
+            task_id='TeamHistory',
+            bash_command=f'{virtual_env} && python3 /home/de_user/bob/projects/FPL-Datawarehouse/dags/03_Gold/Python\ Scripts/10_FctTeamHistory.py'
+    )
+
     # Run Tasks
     # Run bronze tasks in parallel
     [Run_teams_data, Run_teams_players, Run_gameweek_info, Run_players_stats] >> Run_usp_teams_info
@@ -158,14 +167,15 @@ with DAG(
     Run_usp_teams_info >> Run_usp_player_info >> Run_usp_games_info >> Run_usp_future_games_info >> Run_usp_player_stats
 
     # Run dim_* tasks in parallel after silver
-    Run_usp_player_stats >> [Run_dim_teams, Run_dim_players, Run_dim_stats]
+    Run_usp_player_stats >> [Run_dim_teams, Run_dim_players, Run_dim_stats,Run_dim_season]
 
     # Run all fact_* tasks after all dim_* tasks
-    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_player_history
-    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_standing
-    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_results
-    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_player_stats
-    [Run_dim_teams, Run_dim_players, Run_dim_stats] >> Run_fct_future_games
+    [Run_dim_teams, Run_dim_players, Run_dim_stats,Run_dim_season] >> Run_fct_player_history
+    [Run_dim_teams, Run_dim_players, Run_dim_stats,Run_dim_season] >> Run_fct_standing
+    [Run_dim_teams, Run_dim_players, Run_dim_stats,Run_dim_season] >> Run_fct_results
+    [Run_dim_teams, Run_dim_players, Run_dim_stats,Run_dim_season] >> Run_fct_player_stats
+    [Run_dim_teams, Run_dim_players, Run_dim_stats,Run_dim_season] >> Run_fct_future_games
+    [Run_dim_teams, Run_dim_players, Run_dim_stats,Run_dim_season] >> Run_fct_team_history
 
 ```
 Here’s the visual representation of the DAG execution flow:
