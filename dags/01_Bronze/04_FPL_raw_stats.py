@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv('/home/luxds/Bob/Fantasy/.env')
+load_dotenv(os.getenv('location'))
 
 # Define stats list globally
 stats_list = ["goals_scored", "own_goals", "yellow_cards", "red_cards", "assists",
@@ -75,6 +75,8 @@ def upload_to_postgres(df):
     host = os.getenv('host')
     port = os.getenv('port')
 
+    print()
+
     # Validate database parameters
     if not all([dbname, user, password, host, port]):
         raise ValueError("❌ Missing database connection parameters")
@@ -91,7 +93,7 @@ def upload_to_postgres(df):
             'player_stats',
             engine,
             schema='bronze',
-            if_exists='append',  # Changed to append instead of replace
+            if_exists='replace',  # Changed to append instead of replace
             index=False,
             method='multi'  # Added for better performance with PostgreSQL
         )

@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import os
 
 #Load Environment Variables
-load_dotenv('/home/luxds/Bob/Fantasy/.env')
+load_dotenv(os.getenv('location'))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
