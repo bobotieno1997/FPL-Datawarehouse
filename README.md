@@ -179,7 +179,7 @@ with DAG(
 
 ```
 Here’s the visual representation of the DAG execution flow:
-![Airflow](https://github.com/bobotieno1997/FPL-Datawarehouse/blob/3c80cc938e837b3cdafc123f8afb7909bcb5ca6e/project_files/Other%20files/airflow_dags.png)
+![Airflow](https://github.com/bobotieno1997/FPL-Datawarehouse/blob/ab17a7d46bef4ba10d587b876387cf2870d19544/project_files/Other%20files/airflow_dags.png)
 
 Sample data from the tables:
 
